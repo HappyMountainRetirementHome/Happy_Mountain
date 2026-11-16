@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>World Clocks</title>
+<style>
+  :root {
+    --bg: #000;
+    --label: #8a8f98;
+    --date: #b8bcc4;
+    --time: #f2f2f2;
+    --sec: #6b7078;
+    --zulu: #ffd54a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: var(--bg);
+    color: var(--time);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    overflow: hidden;
+    cursor: none;
+  }
+  .grid {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(4, 1fr);
+    gap: 0 5vw;
+    padding: 4vh 6vw;   /* safe margin for TV overscan */
+    align-items: center;
+  }
+  .clock { min-width: 0; }
+  .label { font-size: 2.8vh; color: var(--label); letter-spacing: .02em; }
+  .date  { font-size: 3.2vh; color: var(--date); margin-top: .4vh; }
+  .time  {
+    font-size: 10.5vh; line-height: 1.05; font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .time .s { font-size: .6em; color: var(--sec); }
+  .zulu .label, .zulu .time { color: var(--zulu); }
+  .zulu .time .s { color: var(--zulu); opacity: .6; }
+
+  @media (max-width: 800px) {
+    .grid { grid-template-columns: 1fr; grid-template-rows: none; overflow-y: auto; }
+    html, body { overflow: auto; }
+    .time { font-size: 7vh; }
+  }
+</style>
+</head>
+<body>
+<main class="grid" id="grid"></main>
+
+<script>
+// Named zones handle daylight saving automatically.
+// Order fills the grid left-to-right, row by row.
+const CLOCKS = [
+  { name: "Local",         tz: "Asia/Taipei" },
+  { name: "Mountain Time", tz: "America/Denver" },
+  { name: "UTC/ZULU",      tz: "UTC", zulu: true },
+  { name: "Pacific Time",  tz: "America/Los_Angeles" },
+  { name: "Eastern Time",  tz: "America/New_York" },
+  { name: "Alaska Time",   tz: "America/Anchorage" },
+  { name: "Central Time",  tz: "America/Chicago" }
+];
+
+const grid = document.getElementById("grid");
+
+function fmt(tz, opts) {
+  return new Intl.DateTimeFormat("en-US", Object.assign({ timeZone: tz }, opts));
+}
+
+CLOCKS.forEach(c => {
+  c.dateFmt = fmt(c.tz, { weekday: "long", month: "long", day: "2-digit", year: "numeric" });
+  c.timeFmt = fmt(c.tz, { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+  c.offFmt  = fmt(c.tz, { timeZoneName: "shortOffset" });
+
+  const el = document.createElement("section");
+  el.className = "clock" + (c.zulu ? " zulu" : "");
+  el.innerHTML = '<div class="label"></div><div class="date"></div><div class="time"></div>';
+  grid.appendChild(el);
+  c.label = el.querySelector(".label");
+  c.date  = el.querySelector(".date");
+  c.time  = el.querySelector(".time");
+  c.last = { label: "", date: "", hm: "" };
+});
+
+function offsetText(c, now) {
+  const p = c.offFmt.formatToParts(now).find(x => x.type === "timeZoneName").value;
+  const v = p.replace("GMT", "UTC");
+  return v === "UTC" ? "UTC ±0" : v;
+}
+
+function tick() {
+  const now = new Date();
+  CLOCKS.forEach(c => {
+    const label = c.name + " (" + offsetText(c, now) + ")";
+    if (label !== c.last.label) { c.label.textContent = label; c.last.label = label; }
+
+    // "Monday, November 16, 2026" -> "Monday, November 16 2026"
+    const date = c.dateFmt.format(now).replace(/,\s(\d{4})$/, " $1");
+    if (date !== c.last.date) { c.date.textContent = date; c.last.date = date; }
+
+    const [h, m, s] = c.timeFmt.format(now).split(":");
+    const hm = h + ":" + m;
+    if (hm !== c.last.hm) {
+      c.time.innerHTML = hm + ':<span class="s"></span>';
+      c.sec = c.time.querySelector(".s");
+      c.last.hm = hm;
+    }
+    c.sec.textContent = s;
+  });
+  // align to the next whole second
+  setTimeout(tick, 1000 - (Date.now() % 1000));
+}
+tick();
+</script>
+</body>
+</html>
