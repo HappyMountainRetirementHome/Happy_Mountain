@@ -12,6 +12,9 @@
     --time: #f2f2f2;
     --sec: #6b7078;
     --zulu: #ffd54a;
+    --card: #1b1b1b;
+    --card-low: #141414;
+    --flip: 120ms;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -28,20 +31,82 @@
     grid-template-columns: 1fr 1fr;
     grid-template-rows: repeat(4, 1fr);
     gap: 0 5vw;
-    padding: 4vh 6vw;   /* safe margin for TV overscan */
+    padding: 4vh 6vw 13vh;   /* safe margin for TV overscan + ticker */
     align-items: center;
   }
   .clock { min-width: 0; }
   .label { font-size: 2.8vh; color: var(--label); letter-spacing: .02em; }
-  .date  { font-size: 3.2vh; color: var(--date); margin-top: .4vh; }
-  .time  {
-    font-size: 10.5vh; line-height: 1.05; font-weight: 300;
+  .date  { font-size: 3.2vh; color: var(--date); margin-top: .4vh; margin-bottom: .6vh; }
+
+  .time {
+    display: flex; align-items: center;
+    font-size: 8.5vh; line-height: 1;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  .time .s { font-size: .6em; color: var(--sec); }
+  .colon { width: .3em; text-align: center; color: var(--sec); padding-bottom: .06em; }
+  .sec   { font-size: .6em; color: var(--sec); font-weight: 300; align-self: flex-end; padding: 0 0 .1em .25em; }
   .zulu .label, .zulu .time { color: var(--zulu); }
-  .zulu .time .s { color: var(--zulu); opacity: .6; }
+  .zulu .colon, .zulu .sec { color: var(--zulu); opacity: .6; }
+
+  /* ---------- split-flap digit ---------- */
+  .flap {
+    position: relative; display: inline-block;
+    width: .66em; height: 1em; margin: 0 .025em;
+    perspective: 6em;
+  }
+  .flap .top, .flap .bot, .flap .lt, .flap .lb {
+    position: absolute; left: 0; right: 0; height: .5em;
+    overflow: hidden; background: var(--card);
+    backface-visibility: hidden;
+  }
+  .flap .top, .flap .lt { top: 0; border-radius: .09em .09em 0 0; transform-origin: 50% 100%; }
+  .flap .bot, .flap .lb { top: .5em; border-radius: 0 0 .09em .09em; background: var(--card-low); transform-origin: 50% 0; }
+  .flap i {
+    position: absolute; left: 0; right: 0; height: 1em;
+    line-height: 1em; text-align: center; font-style: normal;
+  }
+  .flap .top i, .flap .lt i { top: 0; }
+  .flap .bot i, .flap .lb i { top: -.5em; }
+
+  /* the hinge line down the middle of each card */
+  .flap::after {
+    content: ""; position: absolute; left: 0; right: 0; top: calc(.5em - 1px);
+    height: 2px; background: #000; z-index: 5;
+  }
+
+  /* animated leaves are hidden unless a flip is running */
+  .flap .lt, .flap .lb { visibility: hidden; z-index: 3; }
+  .flap.go .lt, .flap.go .lb { visibility: visible; }
+  .flap.go .lt { animation: fallTop var(--flip) ease-in both; }
+  .flap.go .lb { animation: fallBot var(--flip) ease-out var(--flip) both; }
+  @keyframes fallTop { from { transform: rotateX(0); }      to { transform: rotateX(-90deg); } }
+  @keyframes fallBot { from { transform: rotateX(90deg); }  to { transform: rotateX(0); } }
+
+  /* ---------- weather + Taiwan Strait panel ---------- */
+  .panel { min-width: 0; display: grid; grid-template-columns: 1fr 1.4fr; gap: 2vw; color: var(--date); transition: opacity .5s; }
+  .panel.stale { opacity: .45; }
+  .panel h3 { margin: 0 0 .6vh; font-size: 2.4vh; font-weight: 400; color: var(--label); white-space: nowrap; }
+  .panel .big { font-size: 6vh; font-weight: 300; line-height: 1; color: var(--time); }
+  .panel .sm { font-size: 2.2vh; color: var(--label); }
+  .stats { display: flex; gap: 1.4vw; }
+  .spark { width: 100%; height: 4vh; margin-top: .8vh; display: block; }
+
+  /* ---------- news ticker ---------- */
+  .ticker { position: fixed; left: 6vw; right: 6vw; bottom: 3vh; height: 7vh; display: flex; align-items: stretch;
+            background: #0c0c0c; border-top: 1px solid #2a2a2a; overflow: hidden; }
+  .tag { flex: none; display: flex; align-items: center; padding: 0 1.6vw; font-size: 2.8vh; letter-spacing: .04em; background: #3a3d42; color: #fff; }
+  .tag.brk { background: #c4161c; animation: blink 1s steps(2) infinite; }
+  .tag.off { background: #7a5a00; }
+  @keyframes blink { 50% { opacity: .55; } }
+  .vp { flex: 1; overflow: hidden; display: flex; align-items: center; }
+  .track { display: flex; white-space: nowrap; will-change: transform; animation: scroll var(--dur, 120s) linear infinite; }
+  .item { font-size: 3.3vh; padding-right: 4vw; color: #d8dbe0; }
+  .item b { font-weight: 400; color: var(--label); margin-right: .6em; }
+  .item.alert { color: var(--zulu); }
+  .item.brk b { color: #ff7b7b; }
+  @keyframes scroll { to { transform: translateX(-50%); } }
 
   @media (max-width: 800px) {
     .grid { grid-template-columns: 1fr; grid-template-rows: none; overflow-y: auto; }
@@ -52,8 +117,16 @@
 </head>
 <body>
 <main class="grid" id="grid"></main>
+<div class="ticker"><div class="tag" id="tag">NEWS</div><div class="vp"><div class="track" id="track"></div></div></div>
 
 <script>
+// ---- settings ----
+const FLIP_MS = 120;            // speed of one flap; lower = faster
+const FLIP_EVERY_MINUTE = false; // true = also flip the last minute digit each minute
+const TEST = location.search.includes("test"); // add ?test to the URL to trigger the effect every 12 s
+
+document.documentElement.style.setProperty("--flip", FLIP_MS + "ms");
+
 // Named zones handle daylight saving automatically.
 // Order fills the grid left-to-right, row by row.
 const CLOCKS = [
@@ -72,7 +145,58 @@ function fmt(tz, opts) {
   return new Intl.DateTimeFormat("en-US", Object.assign({ timeZone: tz }, opts));
 }
 
-CLOCKS.forEach(c => {
+// ---------- flap helpers ----------
+function makeFlap() {
+  const el = document.createElement("span");
+  el.className = "flap";
+  el.innerHTML = '<span class="top"><i></i></span><span class="bot"><i></i></span>' +
+                 '<span class="lt"><i></i></span><span class="lb"><i></i></span>';
+  const q = s => el.querySelector(s + " i");
+  return { el, top: q(".top"), bot: q(".bot"), lt: q(".lt"), lb: q(".lb"), cur: "", spinning: false };
+}
+
+function setNow(f, ch) {
+  f.cur = ch;
+  f.top.textContent = f.bot.textContent = ch;
+}
+
+function flipOnce(f, ch, done) {
+  const old = f.cur;
+  f.top.textContent = ch;   // new top is revealed as the old leaf falls
+  f.bot.textContent = old;  // old bottom stays until the new leaf lands
+  f.lt.textContent = old;
+  f.lb.textContent = ch;
+  f.el.classList.add("go");
+  setTimeout(() => {
+    f.bot.textContent = ch;
+    f.cur = ch;
+    f.el.classList.remove("go");
+    if (done) done();
+  }, FLIP_MS * 2);
+}
+
+// Solari-style: spin through random digits, then land on the real one.
+function spinTo(f, final, delay, spins) {
+  const seq = [];
+  for (let i = 0; i < spins; i++) seq.push(String(Math.floor(Math.random() * 10)));
+  seq.push(final);
+  f.spinning = true;
+  let i = 0;
+  (function step() {
+    if (i >= seq.length) { f.spinning = false; return; }
+    const ch = seq[i++];
+    if (ch === f.cur) return step();
+    flipOnce(f, ch, step);
+  })();
+}
+function spinToDelayed(f, final, delay, spins) {
+  f.spinning = true;
+  setTimeout(() => spinTo(f, final, 0, spins), delay);
+}
+
+// ---------- build clocks ----------
+CLOCKS.forEach((c, idx) => {
+  c.idx = idx;
   c.dateFmt = fmt(c.tz, { weekday: "long", month: "long", day: "2-digit", year: "numeric" });
   c.timeFmt = fmt(c.tz, { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
   c.offFmt  = fmt(c.tz, { timeZoneName: "shortOffset" });
@@ -83,14 +207,27 @@ CLOCKS.forEach(c => {
   grid.appendChild(el);
   c.label = el.querySelector(".label");
   c.date  = el.querySelector(".date");
-  c.time  = el.querySelector(".time");
-  c.last = { label: "", date: "", hm: "" };
+
+  const time = el.querySelector(".time");
+  c.flaps = [makeFlap(), makeFlap(), makeFlap(), makeFlap()];
+  const colon = () => { const s = document.createElement("span"); s.className = "colon"; s.textContent = ":"; return s; };
+  time.append(c.flaps[0].el, c.flaps[1].el, colon(), c.flaps[2].el, c.flaps[3].el);
+  c.sec = document.createElement("span");
+  c.sec.className = "sec";
+  time.append(c.sec);
+
+  c.last = { label: "", date: "", h: null, m: null };
 });
 
 function offsetText(c, now) {
   const p = c.offFmt.formatToParts(now).find(x => x.type === "timeZoneName").value;
   const v = p.replace("GMT", "UTC");
   return v === "UTC" ? "UTC ±0" : v;
+}
+
+// the cascade: every digit spins, left to right, clocks staggered one after another
+function hourFlip(c, digits) {
+  c.flaps.forEach((f, i) => spinToDelayed(f, digits[i], c.idx * 180 + i * 60, 5 + i * 3));
 }
 
 function tick() {
@@ -104,18 +241,103 @@ function tick() {
     if (date !== c.last.date) { c.date.textContent = date; c.last.date = date; }
 
     const [h, m, s] = c.timeFmt.format(now).split(":");
-    const hm = h + ":" + m;
-    if (hm !== c.last.hm) {
-      c.time.innerHTML = hm + ':<span class="s"></span>';
-      c.sec = c.time.querySelector(".s");
-      c.last.hm = hm;
+    const digits = (h + m).split("");
+
+    if (c.last.h === null) {
+      c.flaps.forEach((f, i) => setNow(f, digits[i]));          // first paint, no animation
+    } else if (h !== c.last.h) {
+      hourFlip(c, digits);                                       // top of the hour
+    } else if (m !== c.last.m) {
+      c.flaps.forEach((f, i) => {
+        if (f.spinning || f.cur === digits[i]) return;
+        if (FLIP_EVERY_MINUTE && i === 3) flipOnce(f, digits[i]);
+        else setNow(f, digits[i]);
+      });
     }
+    c.last.h = h; c.last.m = m;
     c.sec.textContent = s;
   });
-  // align to the next whole second
-  setTimeout(tick, 1000 - (Date.now() % 1000));
+  setTimeout(tick, 1000 - (Date.now() % 1000)); // align to the next whole second
 }
 tick();
+
+// ---------- weather, Taiwan Strait panel and news ticker (data.js comes from fetch_feeds.py) ----------
+const panel = document.createElement("section");
+panel.className = "panel";
+panel.innerHTML = '<div id="wx"></div><div id="st"></div>';
+grid.appendChild(panel);
+const tag = document.getElementById("tag"), track = document.getElementById("track");
+const WX = c => c === 0 ? "Clear" : c <= 2 ? "Partly cloudy" : c === 3 ? "Overcast" : c <= 48 ? "Fog" :
+                c <= 57 ? "Drizzle" : c <= 67 ? "Rain" : c <= 77 ? "Snow" : c <= 82 ? "Showers" : "Thunderstorms";
+let sig = "";
+
+function render() {
+  const F = window.FEED;
+  if (!F) return;
+  const stale = Date.now() / 1000 - F.generated > 1800;   // feeds older than 30 min
+  panel.classList.toggle("stale", stale);
+
+  const w = F.weather || [];
+  document.getElementById("wx").innerHTML = '<h3>Weather</h3>' + (w.length
+    ? '<div class="big">' + w[0].temp + '°</div><div class="sm">' + w[0].city + ' · ' + WX(w[0].code) +
+      '<br>H ' + w[0].hi + '° L ' + w[0].lo + '°</div><div class="sm" style="margin-top:1vh">' +
+      w.slice(1).map(x => x.city + ' ' + x.temp + '°').join(' · ') + '</div>'
+    : '<div class="sm">unavailable</div>');
+
+  const s = F.strait, el = document.getElementById("st");
+  if (!s) {
+    el.innerHTML = '<h3>Taiwan Strait · MND daily report</h3><div class="sm">data unavailable</div>';
+  } else {
+    const L = s.latest, H = s.history, mx = Math.max(1, ...H), bw = 100 / H.length;
+    const bars = H.map((v, i) => '<rect x="' + (i * bw) + '" y="' + (24 - 24 * v / mx) + '" width="' + (bw - .8) +
+      '" height="' + (24 * v / mx) + '" fill="' + (i === H.length - 1 ? "#f2f2f2" : "#6b7078") + '"/>').join("");
+    const stat = (n, t) => '<div><span class="big">' + n + '</span><div class="sm">' + t + '</div></div>';
+    el.innerHTML = '<h3>Taiwan Strait · MND report ' + L.date + '</h3><div class="stats">' +
+      stat(L.aircraft, "aircraft") + stat(L.ships, "navy ships") + stat(L.official, "official ships") +
+      stat(L.median, "crossed median") + '</div><svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none">' +
+      bars + '</svg><div class="sm">aircraft per report, last ' + H.length + '</div>';
+  }
+
+  let items = F.news || [];
+  const brk = items.some(i => i.breaking);
+  if (stale) items = [{ src: "!", title: "News feed last updated " + new Date(F.generated * 1000).toLocaleTimeString() }].concat(items);
+  if (!items.length) items = [{ src: "", title: "Waiting for news feeds…" }];
+  tag.textContent = stale ? "OFFLINE" : brk ? "BREAKING" : "NEWS";
+  tag.className = "tag" + (stale ? " off" : brk ? " brk" : "");
+
+  const nsig = stale + items.map(i => i.title).join("|");
+  if (nsig === sig) return;
+  sig = nsig;
+  const mk = () => items.map(i => {
+    const d = document.createElement("span"), b = document.createElement("b");
+    d.className = "item" + (i.breaking ? " brk" : i.alert ? " alert" : "");
+    b.textContent = i.src;
+    d.append(b, i.title);
+    return d;
+  });
+  track.replaceChildren(...mk(), ...mk());   // doubled so the loop is seamless
+  track.style.setProperty("--dur", (track.scrollWidth / 2 / (innerHeight * 0.12)) + "s");
+}
+
+function loadFeed() {
+  const s = document.createElement("script");
+  s.src = "data.js?" + Date.now();           // works from file:// (fetch would be blocked)
+  s.onload = () => { render(); s.remove(); };
+  s.onerror = () => s.remove();
+  document.head.appendChild(s);
+}
+loadFeed();
+setInterval(loadFeed, 60000);
+
+if (TEST) {
+  setInterval(() => {
+    const now = new Date();
+    CLOCKS.forEach(c => {
+      const [h, m] = c.timeFmt.format(now).split(":");
+      hourFlip(c, (h + m).split(""));
+    });
+  }, 12000);
+}
 </script>
 </body>
 </html>
